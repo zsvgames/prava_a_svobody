@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Střet práv — případy z praxe</title>
+<style>
+  :root{
+    --paper:#efe3c6;
+    --paper-light:#f8f1de;
+    --ink:#2b2316;
+    --ink-soft:#6d5c40;
+    --stamp:#a3372c;
+    --line:#c7b384;
+    --tab:#e6cf98;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      repeating-linear-gradient(0deg, rgba(43,35,22,0.02) 0px, rgba(43,35,22,0.02) 1px, transparent 1px, transparent 3px),
+      radial-gradient(circle at 50% -10%, var(--paper-light) 0%, var(--paper) 60%);
+    color:var(--ink);
+    font-family:"Iowan Old Style","Palatino Linotype", Georgia, "Times New Roman", serif;
+    min-height:100vh;
+    overflow-x:hidden;
+  }
+  .mono{font-family:"Courier New", monospace;}
+
+  /* ---------- LETTERHEAD ---------- */
+  header{
+    padding:30px 20px 22px;
+    text-align:center;
+    border-bottom:3px double var(--ink);
+  }
+  .seal{
+    display:block;
+    width:46px; height:46px;
+    margin:0 auto 12px;
+    color:var(--ink-soft);
+  }
+  .eyebrow{
+    font-size:10.5px;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+    letter-spacing:0.24em;
+    margin-bottom:14px;
+    font-family:"Courier New", monospace;
+  }
+  .eyebrow::before{ content:"— "; }
+  .eyebrow::after{ content:" —"; }
+  h1{
+    font-size:clamp(25px,7vw,33px);
+    font-weight:700;
+    margin:0;
+    line-height:1.18;
+    color:var(--ink);
+  }
+  h1 em{
+    color:var(--stamp);
+    font-style:italic;
+  }
+  .subtitle{
+    margin-top:12px;
+    font-size:13.5px;
+    color:var(--ink-soft);
+    line-height:1.55;
+    max-width:400px;
+    margin-left:auto;
+    margin-right:auto;
+    font-style:italic;
+  }
+
+  /* ---------- FOLDER LIST ---------- */
+  main{
+    padding:34px 18px 50px;
+    max-width:520px;
+    margin:0 auto;
+  }
+  .case-list{
+    display:flex;
+    flex-direction:column;
+    gap:26px;
+  }
+  .folder{
+    position:relative;
+    background:var(--paper-light);
+    border:1px solid var(--line);
+    padding:20px 18px 16px;
+    cursor:pointer;
+    box-shadow:3px 4px 0 rgba(43,35,22,0.10);
+    transition:transform .12s ease, box-shadow .12s ease;
+  }
+  .folder:active{
+    transform:translate(2px,2px);
+    box-shadow:1px 1px 0 rgba(43,35,22,0.10);
+  }
+  .tab{
+    position:absolute;
+    top:-15px; left:16px;
+    background:var(--tab);
+    border:1px solid var(--line);
+    border-bottom:none;
+    padding:4px 10px 8px;
+    font-size:9.5px;
+    letter-spacing:0.1em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+    clip-path:polygon(6% 0, 94% 0, 100% 100%, 0% 100%);
+  }
+  .folder-head{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    gap:10px;
+    margin-bottom:10px;
+    padding-bottom:8px;
+    border-bottom:1px solid var(--line);
+  }
+  .folder-num{
+    font-size:11px;
+    letter-spacing:0.08em;
+    color:var(--ink-soft);
+  }
+  .folder-cat{
+    font-size:10px;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+    color:var(--stamp);
+  }
+  .folder h2{
+    font-size:16px;
+    line-height:1.32;
+    margin:0 0 7px;
+    color:var(--ink);
+    font-weight:700;
+  }
+  .folder p{
+    font-size:12.5px;
+    color:var(--ink-soft);
+    line-height:1.5;
+    margin:0;
+    display:-webkit-box;
+    -webkit-line-clamp:2;
+    -webkit-box-orient:vertical;
+    overflow:hidden;
+  }
+  .open-row{
+    margin-top:14px;
+    padding-top:10px;
+    border-top:1px dashed var(--line);
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    font-size:10.5px;
+    letter-spacing:0.1em;
+    text-transform:uppercase;
+    color:var(--stamp);
+  }
+  .open-row .arrow{ transition:transform .15s ease; }
+  .folder:active .open-row .arrow{ transform:translateX(4px); }
+
+  /* ---------- CASE FILE (DETAIL) ---------- */
+  .overlay{
+    position:fixed;
+    inset:0;
+    background:var(--paper-light);
+    transform:translateY(100%);
+    transition:transform .32s cubic-bezier(.4,0,.2,1);
+    overflow-y:auto;
+    z-index:50;
+  }
+  .overlay.active{ transform:translateY(0); }
+  .overlay-inner{
+    max-width:560px;
+    margin:0 auto;
+    padding:0 0 60px;
+  }
+  .topbar{
+    position:sticky;
+    top:0;
+    background:rgba(248,241,222,0.94);
+    -webkit-backdrop-filter:blur(6px);
+    backdrop-filter:blur(6px);
+    border-bottom:3px double var(--ink);
+    padding:14px 18px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    z-index:5;
+  }
+  .back-btn{
+    background:none;
+    border:1px solid var(--ink);
+    color:var(--ink);
+    font-family:"Courier New", monospace;
+    font-size:11.5px;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+    padding:7px 12px;
+    cursor:pointer;
+  }
+  .back-btn:active{ background:var(--tab); }
+  .topbar .case-tag{
+    font-family:"Courier New", monospace;
+    font-size:10.5px;
+    color:var(--ink-soft);
+    letter-spacing:0.1em;
+  }
+
+  .case-hero{
+    padding:26px 22px 20px;
+    border-bottom:1px solid var(--line);
+  }
+  .case-hero h2{
+    font-size:clamp(21px,6.2vw,27px);
+    line-height:1.28;
+    margin:0;
+    color:var(--ink);
+  }
+
+  .case-body{ padding:22px; }
+  .case-body p{
+    font-size:15px;
+    line-height:1.7;
+    color:var(--ink);
+    margin:0 0 18px;
+  }
+  .case-body p:first-of-type::first-letter{
+    font-size:2.6em;
+    font-weight:700;
+    float:left;
+    line-height:0.85;
+    padding-right:6px;
+    padding-top:4px;
+    color:var(--stamp);
+  }
+  .case-body p:last-of-type{ margin-bottom:0; }
+
+  /* ---------- VERDICT (collapsible dropdown) ---------- */
+  .verdict{
+    margin:10px 22px 0;
+    border:1px solid var(--line);
+    background:var(--paper);
+    overflow:hidden;
+    box-shadow:2px 2px 0 rgba(43,35,22,0.06);
+  }
+  .verdict summary{
+    list-style:none;
+    cursor:pointer;
+    padding:13px 15px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+  }
+  .verdict summary::-webkit-details-marker{ display:none; }
+  .verdict summary::marker{ content:""; }
+  .verdict summary:active{ background:var(--tab); }
+  .verdict .vb-label{
+    font-family:"Courier New", monospace;
+    font-size:10px;
+    letter-spacing:0.16em;
+    text-transform:uppercase;
+    color:var(--stamp);
+    margin:0;
+  }
+  .verdict .vb-toggle{
+    font-family:"Courier New", monospace;
+    font-size:12px;
+    line-height:1;
+    color:var(--stamp);
+    flex-shrink:0;
+    transition:transform .2s ease;
+  }
+  .verdict[open] .vb-toggle{ transform:rotate(180deg); }
+  .verdict .vb-body{
+    position:relative;
+    border-top:1px dashed var(--line);
+    padding:16px 100px 16px 15px;
+  }
+  .verdict .vb-body p{
+    font-size:14px;
+    line-height:1.6;
+    color:var(--ink);
+    margin:0;
+  }
+  .verdict-stamp{
+    position:absolute;
+    top:14px; right:10px;
+    width:80px; height:80px;
+    border:3px solid var(--stamp);
+    border-radius:50%;
+    transform:rotate(-16deg);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+    color:var(--stamp);
+    font-family:"Courier New", monospace;
+    font-size:8.5px;
+    font-weight:700;
+    letter-spacing:0.04em;
+    text-transform:uppercase;
+    line-height:1.25;
+    opacity:0.8;
+    mix-blend-mode:multiply;
+  }
+  .verdict-stamp::before{
+    content:"";
+    position:absolute;
+    inset:7px;
+    border:1px solid var(--stamp);
+    border-radius:50%;
+  }
+
+  .questions{
+    position:relative;
+    margin:34px 22px 0;
+    padding-top:6px;
+  }
+  .questions .clip{
+    position:absolute;
+    top:-16px; left:-6px;
+    width:26px; height:44px;
+    color:var(--ink-soft);
+    opacity:0.85;
+    transform:rotate(-8deg);
+  }
+  .questions .q-heading{
+    font-family:"Courier New", monospace;
+    font-size:10.5px;
+    letter-spacing:0.16em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+    margin-bottom:14px;
+    padding-left:26px;
+  }
+  .q-item{
+    border:1px solid var(--line);
+    background:var(--paper-light);
+    padding:13px 15px;
+    margin-bottom:9px;
+    display:flex;
+    gap:12px;
+    box-shadow:2px 2px 0 rgba(43,35,22,0.06);
+  }
+  .q-num{
+    font-family:"Courier New", monospace;
+    color:var(--stamp);
+    font-size:11px;
+    flex-shrink:0;
+    padding-top:2px;
+    letter-spacing:0.02em;
+  }
+  .q-item p{
+    font-size:14px;
+    line-height:1.55;
+    color:var(--ink);
+    margin:0;
+  }
+
+  .end-spacer{ height:30px; }
+
+  .name-gate{
+    position:fixed; inset:0;
+    background:var(--paper);
+    z-index:100;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:30px;
+  }
+  .name-gate-box{
+    max-width:340px;
+    width:100%;
+    text-align:center;
+    border:1px solid var(--line);
+    background:var(--paper-light);
+    padding:30px 24px;
+    box-shadow:4px 5px 0 rgba(43,35,22,0.10);
+  }
+  .name-gate-box .seal{ margin-bottom:16px; }
+  .name-gate-box p{
+    font-size:13px;
+    color:var(--ink-soft);
+    line-height:1.6;
+    margin:0 0 18px;
+  }
+  .name-gate-box button{
+    width:100%;
+    background:var(--stamp);
+    border:none;
+    color:#fbf3e2;
+    font-family:"Courier New", monospace;
+    font-size:12px;
+    letter-spacing:0.1em;
+    text-transform:uppercase;
+    font-weight:700;
+    padding:13px 14px;
+    cursor:pointer;
+  }
+</style>
+</head>
+<body>
+
+<div class="name-gate" id="nameGate">
+  <div class="name-gate-box">
+    <svg class="seal" viewBox="0 0 48 48" fill="none">
+      <path d="M24 4 L24 30 M14 10 L34 10 M14 10 L9 22 L19 22 Z M34 10 L29 22 L39 22 Z" stroke="currentColor" stroke-width="1.6" fill="none"/>
+      <rect x="16" y="34" width="16" height="4" fill="currentColor"/>
+      <line x1="24" y1="30" x2="24" y2="34" stroke="currentColor" stroke-width="1.6"/>
+    </svg>
+    <div class="eyebrow">Listina základních práv a svobod</div>
+    <p>Tři skutečné případy Ústavního soudu, ve kterých se střetla dvě základní práva. Otevři si spisovou složku a zkus roli soudce sám.</p>
+    <button onclick="enterActivity()">Otevřít spisy</button>
+  </div>
+</div>
+
+<header>
+  <svg class="seal" viewBox="0 0 48 48" fill="none">
+    <path d="M24 4 L24 30 M14 10 L34 10 M14 10 L9 22 L19 22 Z M34 10 L29 22 L39 22 Z" stroke="currentColor" stroke-width="1.6" fill="none"/>
+    <rect x="16" y="34" width="16" height="4" fill="currentColor"/>
+    <line x1="24" y1="30" x2="24" y2="34" stroke="currentColor" stroke-width="1.6"/>
+  </svg>
+  <div class="eyebrow">Listina základních práv a svobod</div>
+  <h1>Když právo<br><em>naráží na právo</em></h1>
+  <p class="subtitle">Tři skutečné spory, ve kterých se střetla dvě základní práva. Vyber si spis a rozhodni, jak bys jednal jako soudce Ústavního soudu.</p>
+</header>
+
+<main>
+  <div class="case-list">
+
+    <div class="folder" data-num="01" data-target="case-1">
+      <div class="tab">Spis 01/03</div>
+      <div class="folder-head"><span class="folder-num mono">Č.j. 01/03</span><span class="folder-cat">Svoboda projevu</span></div>
+      <h2>Podněcování k nenávisti</h2>
+      <p>Publicista tvrdil, že jen využíval svobodu projevu. Soud rozhodl jinak.</p>
+      <div class="open-row"><span>Otevřít spis</span><span class="arrow">→</span></div>
+    </div>
+
+    <div class="folder" data-num="02" data-target="case-2">
+      <div class="tab">Spis 02/03</div>
+      <div class="folder-head"><span class="folder-num mono">Č.j. 02/03</span><span class="folder-cat">Soukromí na pracovišti</span></div>
+      <h2>Tajná kamera jako důkaz v trestním řízení</h2>
+      <p>Skrytá kamera bez cedule odhalila zloděje. Může být takový důkaz použit u soudu?</p>
+      <div class="open-row"><span>Otevřít spis</span><span class="arrow">→</span></div>
+    </div>
+
+    <div class="folder" data-num="03" data-target="case-3">
+      <div class="tab">Spis 03/03</div>
+      <div class="folder-head"><span class="folder-num mono">Č.j. 03/03</span><span class="folder-cat">Vlastnické právo</span></div>
+      <h2>Kauza statkářky Ludmily Havránkové a dostavba dálnice</h2>
+      <p>Osmnáct let sporu o tři hektary pole. Kde končí veřejný zájem a začíná vyvlastnění?</p>
+      <div class="open-row"><span>Otevřít spis</span><span class="arrow">→</span></div>
+    </div>
+
+  </div>
+
+</main>
+
+<!-- ===================== CASE 1 ===================== -->
+<div class="overlay" id="case-1">
+  <div class="overlay-inner">
+    <div class="topbar">
+      <button class="back-btn" onclick="closeCase('case-1')">← Zpět do rejstříku</button>
+      <span class="case-tag">Spis 01 / 03</span>
+    </div>
+    <div class="case-hero">
+      <h2>Podněcování k nenávisti</h2>
+    </div>
+    <div class="case-body">
+      <p>V roce 2015 vyslovil publicista a politik Adam Bartoš při veřejných vystoupeních výroky, které podle státního zastupitelství podněcovaly nenávist vůči Židům a dalším skupinám obyvatel.</p>
+      <p>Bartoš se bránil tím, že pouze využíval svého práva. Tvrdil, že jeho výroky byly součástí veřejné diskuse a neměly být trestně postihovány.</p>
+      <p>Stát naopak argumentoval, že výroky podněcující nenávist nebo diskriminaci vůči určité skupině osob nejsou chráněny stejným způsobem jako běžná politická kritika.</p>
+    </div>
+    <div class="questions">
+      <svg class="clip" viewBox="0 0 26 44" fill="none"><path d="M13 4 v28 a7 7 0 0 1-14 0 V14 a4 4 0 0 1 8 0 v18" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+      <div class="q-heading">Otázky k zamyšlení</div>
+      <div class="q-item"><span class="q-num">01</span><p>Jaká základní práva byla v tomto případě ve střetu?</p></div>
+      <div class="q-item"><span class="q-num">02</span><p>Kde by podle vás měla být hranice mezi svobodou projevu a nenávistnými projevy?</p></div>
+      <div class="q-item"><span class="q-num">03</span><p>Uveďte konkrétní příklad výroku, který by mohl být považován za svobodu projevu, a příklad výroku, který už by mohl být považován za podněcování nenávisti.</p></div>
+    </div>
+    <details class="verdict">
+      <summary>
+        <span class="vb-label">Rozhodnutí Ústavního soudu</span>
+        <span class="vb-toggle" aria-hidden="true">▾</span>
+      </summary>
+      <div class="vb-body">
+        <p>Ústavní soud ústavní stížnost zamítl a dospěl k závěru, že výroky, které podněcují nenávist nebo směřují k omezování práv jiných lidí, jsou trestné. Adam dostal podmínku.</p>
+        <div class="verdict-stamp">Nález<br>Ústavního<br>soudu</div>
+      </div>
+    </details>
+    <div class="end-spacer"></div>
+  </div>
+</div>
+
+<!-- ===================== CASE 2 ===================== -->
+<div class="overlay" id="case-2">
+  <div class="overlay-inner">
+    <div class="topbar">
+      <button class="back-btn" onclick="closeCase('case-2')">← Zpět do rejstříku</button>
+      <span class="case-tag">Spis 02 / 03</span>
+    </div>
+    <div class="case-hero">
+      <h2>Tajná kamera jako důkaz v trestním řízení</h2>
+    </div>
+    <div class="case-body">
+      <p>V jedné české firmě docházelo k opakovaným krádežím zboží a finanční hotovosti ze skladu. Vedení společnosti proto nechalo do prostor skladu tajně nainstalovat skrytý kamerový systém se záznamem. Zaměstnanci o této kameře nebyli informováni, na místě chyběly jakékoli informační tabule o monitorování prostoru.</p>
+      <p>Policie záznam převzala a na jeho základě byl dotyčný zaměstnanec obžalován a následně soudem uznán vinným z trestného činu krádeže.</p>
+      <p>Odsouzený podal ústavní stížnost. Argumentoval tím, že tajné natáčení bez jeho vědomí hrubě zasáhlo do jeho ústavního práva.</p>
+    </div>
+    <div class="questions">
+      <svg class="clip" viewBox="0 0 26 44" fill="none"><path d="M13 4 v28 a7 7 0 0 1-14 0 V14 a4 4 0 0 1 8 0 v18" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+      <div class="q-heading">Otázky k zamyšlení</div>
+      <div class="q-item"><span class="q-num">01</span><p>Která konkrétní základní práva (podle Listiny základních práv a svobod) spolu v tomto případě soupeřila?</p></div>
+      <div class="q-item"><span class="q-num">02</span><p>Proč odsouzený namítal, že chybějící informační tabule dělají z nahrávky nelegální důkaz? Jaký zákon tím podle něj stát porušil?</p></div>
+      <div class="q-item"><span class="q-num">03</span><p>Jak zněl hlavní argument Ústavního soudu, kterým obhájil, že i tajně pořízený záznam může obstát u soudu jako důkaz?</p></div>
+    </div>
+    <details class="verdict">
+      <summary>
+        <span class="vb-label">Rozhodnutí Ústavního soudu</span>
+        <span class="vb-toggle" aria-hidden="true">▾</span>
+      </summary>
+      <div class="vb-body">
+        <p>Ústavní soud stížnost odsouzeného zamítl a použití záznamu potvrdil. Konstatoval, že v trestním řízení lze za určitých podmínek použít i záznam z kamery, která nesplňovala všechny administrativní náležitosti (chybějící tabule), pokud byl zásah do soukromí vyvážen ochranou jiného důležitého práva (majetku) a nebylo možné pachatele odhalit jinak.</p>
+        <div class="verdict-stamp">Nález<br>Ústavního<br>soudu</div>
+      </div>
+    </details>
+    <div class="end-spacer"></div>
+  </div>
+</div>
+
+<!-- ===================== CASE 3 ===================== -->
+<div class="overlay" id="case-3">
+  <div class="overlay-inner">
+    <div class="topbar">
+      <button class="back-btn" onclick="closeCase('case-3')">← Zpět do rejstříku</button>
+      <span class="case-tag">Spis 03 / 03</span>
+    </div>
+    <div class="case-hero">
+      <h2>Kauza statkářky Ludmily Havránkové a dostavba dálnice</h2>
+    </div>
+    <div class="case-body">
+      <p>V 90. letech 20. století stát naplánoval dostavbu klíčové dálnice D11 z Prahy do Hradce Králové. V trase plánované komunikace u Hradce Králové se však nacházely pozemky, které patřily statkářce Ludmile Havránkové.</p>
+      <p>Stát (reprezentovaný Ředitelstvím silnic a dálnic) nabídl majitelce finanční výkup podle tabulkových cen. Ludmila Havránková však prodej odmítla.</p>
+      <p>Spor se vlekl od roku 1993. Stát opakovaně měnil strategii. V roce 2010 dokonce vláda schválila zahájení procesu vyvlastnění jejích pozemků za finanční náhradu, což vyvolalo obrovskou celospolečenskou debatu o tom, kam až může stát při zásahu zajít. Havránková se bránila tím, že vyvlastnění je krajní krok a stát dostatečně nevyužil možnost se s ní dohodnout na výměně půdy.</p>
+    </div>
+    <div class="questions">
+      <svg class="clip" viewBox="0 0 26 44" fill="none"><path d="M13 4 v28 a7 7 0 0 1-14 0 V14 a4 4 0 0 1 8 0 v18" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+      <div class="q-heading">Otázky k zamyšlení</div>
+      <div class="q-item"><span class="q-num">01</span><p>Bylo podle vás chování státu v tomto případě přiměřené, když kvůli třem hektarům půdy stála stavba důležité dálnice téměř 20 let?</p></div>
+      <div class="q-item"><span class="q-num">02</span><p>Kde podle vás leží hranice, kdy veřejný zájem jednoznačně převáží nad právem jednotlivce?</p></div>
+    </div>
+    <details class="verdict">
+      <summary>
+        <span class="vb-label">Jak spor skončil</span>
+        <span class="vb-toggle" aria-hidden="true">▾</span>
+      </summary>
+      <div class="vb-body">
+        <p>Případ skončil až v roce 2011 po 18 letech vyjednávání podpisem smluv. Stát od vyvlastnění ustoupil, s paní Havránkovou se nakonec dohodl na směně za jiné pozemky a dálnice mohla být dokončena.</p>
+        <div class="verdict-stamp">Spis<br>uzavřen</div>
+      </div>
+    </details>
+    <div class="end-spacer"></div>
+  </div>
+</div>
+
+<script>
+  document.querySelectorAll('.folder').forEach(card => {
+    card.setAttribute('tabindex', '0');
+    card.setAttribute('role', 'button');
+    const openCase = () => {
+      const overlay = document.getElementById(card.getAttribute('data-target'));
+      if(!overlay) return;
+      overlay.classList.add('active');
+      overlay.scrollTop = 0;
+      document.body.style.overflow = 'hidden';
+    };
+    card.addEventListener('click', openCase);
+    card.addEventListener('keydown', e => {
+      if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); openCase(); }
+    });
+  });
+
+  function closeCase(id){
+    const overlay = document.getElementById(id);
+    if(!overlay) return;
+    overlay.classList.remove('active');
+    document.body.style.overflow = '';
+  }
+
+  document.addEventListener('keydown', e => {
+    if(e.key === 'Escape'){
+      document.querySelectorAll('.overlay.active').forEach(o => o.classList.remove('active'));
+      document.body.style.overflow = '';
+    }
+  });
+
+  function enterActivity(){
+    const gate = document.getElementById('nameGate');
+    if(gate) gate.style.display = 'none';
+  }
+</script>
+
+</body>
+</html>
